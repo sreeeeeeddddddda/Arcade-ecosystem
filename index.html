@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Ecosystem Simulation</title>
+    
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-button: #2d2d2d;
+            --border-color: #3d3d3d;
+            --accent-green: #4CAF50;
+            --accent-blue: #2196F3;
+            --accent-red: #F44336;
+            --text-main: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 280px;
+            background-color: var(--bg-panel);
+            border-right: 2px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: var(--border-color);
+        }
+
+        h3 {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-section, .simulation-section, .stats-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-button);
+            color: var(--text-main);
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #3a3a3a;
+            transform: translateX(2px);
+        }
+
+        .tool-btn.active[data-tool="plant"] { background-color: var(--accent-green); color: white; border-color: var(--accent-green); }
+        .tool-btn.active[data-tool="herbivore"] { background-color: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .tool-btn.active[data-tool="predator"] { background-color: var(--accent-red); color: white; border-color: var(--accent-red); }
+
+        .action-btn {
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .delete-btn:hover {
+            background-color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        /* Stats Color Tags */
+        .stat-count { font-weight: bold; float: right; font-size: 1.1rem; }
+        .text-green { color: var(--accent-green); }
+        .text-blue { color: var(--accent-blue); }
+        .text-red { color: var(--accent-red); }
+
+        /* Main Arena Display */
+        .display-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-dark);
+            padding: 20px;
+        }
+
+        canvas {
+            background-color: #171717;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            color: #666;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <h2>Ecosystem</h2>
+            <hr>
+            
+            <div class="tool-section">
+                <h3>Select Tool</h3>
+                <button id="btn-plant" class="btn tool-btn active" data-tool="plant">🌱 Plant Tree</button>
+                <button id="btn-herbivore" class="btn tool-btn" data-tool="herbivore">🐇 Add Herbivore</button>
+                <button id="btn-predator" class="btn tool-btn" data-tool="predator">🐺 Add Predator</button>
+            </div>
+
+            <div class="simulation-section">
+                <h3>Simulation</h3>
+                <button id="btn-pause" class="btn action-btn">⏸️ Pause</button>
+                <button id="btn-clear" class="btn action-btn delete-btn">🧹 Clear World</button>
+            </div>
+
+            <div class="stats-section">
+                <h3>Live Population</h3>
+                <p>Plants: <span id="stat-plants" class="stat-count text-green">0</span></p>
+                <p>Herbivores: <span id="stat-herbivores" class="stat-count text-blue">0</span></p>
+                <p>Predators: <span id="stat-predators" class="stat-count text-red">0</span></p>
+            </div>
+        </aside>
+
+        <main class="display-area">
+            <canvas id="simCanvas"></canvas>
+            <div class="instructions">
+                <p><strong>Click & Drag</strong> on the grid to paint life. Watch them interact, move, hunt, breed, and survive.</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const CELL_SIZE = 12; 
+        const COLS = 65;      
+        const ROWS = 50;      
+        canvas.width = COLS * CELL_SIZE;
+        canvas.height = ROWS * CELL_SIZE;
+
+        const CONFIG = {
+            plantGrowChance: 0.008,      
+            herbivoreVision: 4,         
+            predatorVision: 6,          
+            starveHerbivore: 0.4,       
+            starvePredator: 0.5,        
+            energyFromPlant: 15,        
+            energyFromHerbivore: 35,    
+            breedEnergy: 45             
+        };
+
+        let grid = new Array(COLS).fill(null).map(() => new Array(ROWS).fill('empty'));
+        let entities = [];
+        let currentTool = 'plant';
+        let isPaused = false;
+        let isDrawing = false;
+
+        class Agent {
+            constructor(x, y, type, energy) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.energy = energy;
+                this.age = 0;
+            }
+
+            wander() {
+                let dx = Math.floor(Math.random() * 3) - 1; 
+                let dy = Math.floor(Math.random() * 3) - 1;
+                this.move(this.x + dx, this.y + dy);
+            }
+
+            move(newX, newY) {
+                if (newX >= 0 && newX < COLS && newY >= 0 && newY < ROWS) {
+                    this.x = newX;
+                    this.y = newY;
+                }
+            }
+        }
+
+        class Herbivore extends Agent {
+            constructor(x, y) {
+                super(x, y, 'herbivore', 25);
+            }
+
+            update() {
+                this.energy -= CONFIG.starveHerbivore;
+                this.age++;
+
+                let target = this.findNearestTarget('plant', CONFIG.herbivoreVision);
+
+                if (target) {
+                    let stepX = Math.sign(target.x - this.x);
+                    let stepY = Math.sign(target.y - this.y);
+                    this.move(this.x + stepX, this.y + stepY);
+
+                    if (grid[this.x][this.y] === 'plant') {
+                        grid[this.x][this.y] = 'empty';
+                        this.energy += CONFIG.energyFromPlant;
+                    }
+                } else {
+                    this.wander();
+                }
+
+                if (this.energy >= CONFIG.breedEnergy) {
+                    this.energy /= 2;
+                    entities.push(new Herbivore(this.x, this.y));
+                }
+            }
+
+            findNearestTarget(targetType, visionRadius) {
+                let closestDist = Infinity;
+                let closestTarget = null;
+
+                for (let dx = -visionRadius; dx <= visionRadius; dx++) {
+                    for (let dy = -visionRadius; dy <= visionRadius; dy++) {
+                        let tx = this.x + dx;
+                        let ty = this.y + dy;
+
+                        if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS) {
+                            if (grid[tx][ty] === targetType) {
+                                let dist = Math.abs(dx) + Math.abs(dy); 
+                                if (dist < closestDist) {
+                                    closestDist = dist;
+                                    closestTarget = { x: tx, y: ty };
+                                }
+                            }
+                        }
+                    }
+                }
+                return closestTarget;
+            }
+        }
+
+        class Predator extends Agent {
+            constructor(x, y) {
+                super(x, y, 'predator', 40);
+            }
+
+            update() {
+                this.energy -= CONFIG.starvePredator;
+                this.age++;
+
+                let target = this.findNearestHerbivore(CONFIG.predatorVision);
+
+                if (target) {
+                    let stepX = Math.sign(target.x - this.x);
+                    let stepY = Math.sign(target.y - this.y);
+                    this.move(this.x + stepX, this.y + stepY);
+
+                    if (Math.abs(this.x - target.x) <= 1 && Math.abs(this.y - target.y) <= 1) {
+                        entities = entities.filter(e => e !== target); 
+                        this.energy += CONFIG.energyFromHerbivore;
+                    }
+                } else {
+                    this.wander();
+                }
+
+                if (this.energy >= CONFIG.breedEnergy + 10) {
+                    this.energy /= 2;
+                    entities.push(new Predator(this.x, this.y));
+                }
+            }
+
+            findNearestHerbivore(visionRadius) {
+                let closestDist = Infinity;
+                let closestTarget = null;
+
+                for (let entity of entities) {
+                    if (entity.type === 'herbivore') {
+                        let dist = Math.abs(entity.x - this.x) + Math.abs(entity.y - this.y);
+                        if (dist <= visionRadius && dist < closestDist) {
+                            closestDist = dist;
+                            closestTarget = entity;
+                        }
+                    }
+                }
+                return closestTarget;
+            }
+        }
+
+        document.querySelectorAll('.tool-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                currentTool = e.target.getAttribute('data-tool');
+            });
+        });
+
+        const pauseBtn = document.getElementById('btn-pause');
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseBtn.innerText = isPaused ? "▶️ Play" : "⏸️ Pause";
+            pauseBtn.style.backgroundColor = isPaused ? "#ff9800" : "#2d2d2d";
+        });
+
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            grid = new Array(COLS).fill(null).map(() => new Array(ROWS).fill('empty'));
+            entities = [];
+        });
+
+        canvas.addEventListener('mousedown', (e) => { isDrawing = true; spawnInput(e); });
+        canvas.addEventListener('mousemove', (e) => { if (isDrawing) spawnInput(e); });
+        window.addEventListener('mouseup', () => isDrawing = false);
+
+        function spawnInput(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+            const clickY = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+
+            if (clickX >= 0 && clickX < COLS && clickY >= 0 && clickY < ROWS) {
+                if (currentTool === 'plant') {
+                    grid[clickX][clickY] = 'plant';
+                } else if (currentTool === 'herbivore') {
+                    if (!entities.some(e => e.x === clickX && e.y === clickY)) {
+                        entities.push(new Herbivore(clickX, clickY));
+                    }
+                } else if (currentTool === 'predator') {
+                    if (!entities.some(e => e.x === clickX && e.y === clickY)) {
+                        entities.push(new Predator(clickX, clickY));
+                    }
+                }
+            }
+        }
+
+        function stepSimulation() {
+            if (isPaused) return;
+
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[x][y] === 'empty' && Math.random() < CONFIG.plantGrowChance) {
+                        grid[x][y] = 'plant';
+                    }
+                }
+            }
+
+            for (let i = entities.length - 1; i >= 0; i--) {
+                let entity = entities[i];
+                entity.update();
+
+                if (entity.energy <= 0) {
+                    entities.splice(i, 1);
+                }
+            }
+        }
+
+        function renderGraphics() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[x][y] === 'plant') {
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+                    }
+                }
+            }
+
+            for (let entity of entities) {
+                if (entity.type === 'herbivore') ctx.fillStyle = '#2196F3';
+                if (entity.type === 'predator') ctx.fillStyle = '#F44336';
+                
+                ctx.fillRect(entity.x * CELL_SIZE, entity.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+
+            let plantCount = 0;
+            for(let r=0; r<COLS; r++) {
+                plantCount += grid[r].filter(cell => cell === 'plant').length;
+            }
+            document.getElementById('stat-plants').innerText = plantCount;
+            document.getElementById('stat-herbivores').innerText = entities.filter(e => e.type === 'herbivore').length;
+            document.getElementById('stat-predators').innerText = entities.filter(e => e.type === 'predator').length;
+        }
+
+        function mainLoop() {
+            stepSimulation();
+            renderGraphics();
+            setTimeout(() => {
+                requestAnimationFrame(mainLoop);
+            }, 1000 / 12); 
+        }
+
+        mainLoop();
+    </script>
+</body>
+</html>
+
+
