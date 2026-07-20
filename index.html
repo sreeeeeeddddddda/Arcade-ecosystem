@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arcade Ecosystem Simulation</title>
+    <title>3D Arcade Ecosystem - Weather Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
         :root {
@@ -14,428 +15,444 @@
             --accent-green: #4CAF50;
             --accent-blue: #2196F3;
             --accent-red: #F44336;
+            --accent-orange: #FF9800;
             --text-main: #e0e0e0;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            user-select: none;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; user-select: none; }
+        body { background-color: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
 
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-        }
+        .app-container { display: flex; width: 100vw; height: 100vh; }
 
-        .app-container {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        /* Sidebar Styling */
         .sidebar {
-            width: 280px;
-            background-color: var(--bg-panel);
-            border-right: 2px solid var(--border-color);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
-            z-index: 10;
+            width: 290px; background-color: var(--bg-panel); border-right: 2px solid var(--border-color);
+            padding: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 10; overflow-y: auto;
         }
 
-        h2 {
-            font-size: 1.4rem;
-            color: #fff;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        h2 { font-size: 1.2rem; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        hr { border: 0; height: 1px; background: var(--border-color); }
+        h3 { font-size: 0.8rem; color: #888; text-transform: uppercase; margin-bottom: 4px; }
 
-        hr {
-            border: 0;
-            height: 1px;
-            background: var(--border-color);
-        }
+        .section { display: flex; flex-direction: column; gap: 6px; }
 
-        h3 {
-            font-size: 0.9rem;
-            color: #888;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-            letter-spacing: 0.5px;
-        }
-
-        .tool-section, .simulation-section, .stats-section {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        /* Buttons */
         .btn {
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background-color: var(--bg-button);
-            color: var(--text-main);
-            font-size: 0.95rem;
-            font-weight: 500;
-            text-align: left;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px;
+            background-color: var(--bg-button); color: var(--text-main); font-size: 0.88rem;
+            font-weight: 500; text-align: left; cursor: pointer; transition: 0.2s;
         }
+        .btn:hover { background-color: #3a3a3a; transform: translateX(2px); }
 
-        .btn:hover {
-            background-color: #3a3a3a;
-            transform: translateX(2px);
-        }
+        .tool-btn.active[data-tool="plant"] { background-color: var(--accent-green); border-color: var(--accent-green); }
+        .tool-btn.active[data-tool="herbivore"] { background-color: var(--accent-blue); border-color: var(--accent-blue); }
+        .tool-btn.active[data-tool="predator"] { background-color: var(--accent-red); border-color: var(--accent-red); }
+        .tool-btn.active[data-tool="meteor"] { background-color: var(--accent-orange); border-color: var(--accent-orange); }
 
-        .tool-btn.active[data-tool="plant"] { background-color: var(--accent-green); color: white; border-color: var(--accent-green); }
-        .tool-btn.active[data-tool="herbivore"] { background-color: var(--accent-blue); color: white; border-color: var(--accent-blue); }
-        .tool-btn.active[data-tool="predator"] { background-color: var(--accent-red); color: white; border-color: var(--accent-red); }
+        .weather-btn.active[data-weather="sunny"] { background-color: #FFEB3B; color: #111; font-weight: bold; }
+        .weather-btn.active[data-weather="rainy"] { background-color: var(--accent-blue); color: white; font-weight: bold; }
 
-        .action-btn {
-            text-align: center;
-            font-weight: bold;
-        }
-
-        .delete-btn:hover {
-            background-color: #721c24;
-            border-color: #f5c6cb;
-        }
-
-        /* Stats Color Tags */
-        .stat-count { font-weight: bold; float: right; font-size: 1.1rem; }
+        .action-btn { text-align: center; font-weight: bold; }
+        .hazard-btn { background-color: #3a1f1d; border-color: #5c2c29; color: #ffbaba; }
+        .bio-btn { background-color: #2c1a3a; border-color: #4a236a; color: #e8b6ff; }
+        
+        .stat-count { font-weight: bold; float: right; }
         .text-green { color: var(--accent-green); }
         .text-blue { color: var(--accent-blue); }
         .text-red { color: var(--accent-red); }
+        .text-purple { color: #d580ff; }
 
-        /* Main Arena Display */
-        .display-area {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-color: var(--bg-dark);
-            padding: 20px;
-        }
-
-        canvas {
-            background-color: #171717;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            cursor: crosshair;
-        }
-
-        .instructions {
-            margin-top: 15px;
-            color: #666;
-            font-size: 0.9rem;
-            text-align: center;
-        }
+        #sim-container { flex-grow: 1; position: relative; }
+        canvas { display: block; width: 100%; height: 100%; outline: none; }
+        
+        .hint { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); color: #aaa; font-size: 0.9rem; pointer-events: none; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;}
     </style>
 </head>
 <body>
 
     <div class="app-container">
         <aside class="sidebar">
-            <h2>Ecosystem</h2>
+            <h2>3D Ecosystem</h2>
             <hr>
             
-            <div class="tool-section">
-                <h3>Select Tool</h3>
-                <button id="btn-plant" class="btn tool-btn active" data-tool="plant">🌱 Plant Tree</button>
-                <button id="btn-herbivore" class="btn tool-btn" data-tool="herbivore">🐇 Add Herbivore</button>
-                <button id="btn-predator" class="btn tool-btn" data-tool="predator">🐺 Add Predator</button>
+            <div class="section">
+                <h3>Placement Tools</h3>
+                <button class="btn tool-btn active" data-tool="plant">🌱 Plant Flora</button>
+                <button class="btn tool-btn" data-tool="herbivore">🐇 Add Herbivore</button>
+                <button class="btn tool-btn" data-tool="predator">🐺 Add Predator</button>
+                <button class="btn tool-btn" data-tool="meteor">☄️ Meteor Strike</button>
             </div>
 
-            <div class="simulation-section">
+            <div class="section">
+                <h3>Weather Control</h3>
+                <button class="btn weather-btn active" data-weather="sunny">☀️ Sunny</button>
+                <button class="btn weather-btn" data-weather="rainy">🌧️ Rainy</button>
+            </div>
+
+            <div class="section">
+                <h3>Global Events</h3>
+                <button id="btn-drought" class="btn hazard-btn">🏜️ Trigger Drought</button>
+                <button id="btn-virus" class="btn bio-btn">☣️ Release Virus</button>
+            </div>
+
+            <div class="section">
                 <h3>Simulation</h3>
                 <button id="btn-pause" class="btn action-btn">⏸️ Pause</button>
-                <button id="btn-clear" class="btn action-btn delete-btn">🧹 Clear World</button>
+                <button id="btn-clear" class="btn action-btn">🧹 Wipe World</button>
             </div>
 
-            <div class="stats-section">
-                <h3>Live Population</h3>
+            <div class="section">
+                <h3>Live Telemetry</h3>
+                <p>Weather: <span id="stat-weather" class="stat-count" style="color: #FFEB3B;">Sunny</span></p>
                 <p>Plants: <span id="stat-plants" class="stat-count text-green">0</span></p>
                 <p>Herbivores: <span id="stat-herbivores" class="stat-count text-blue">0</span></p>
                 <p>Predators: <span id="stat-predators" class="stat-count text-red">0</span></p>
+                <p>Infected: <span id="stat-infected" class="stat-count text-purple">0</span></p>
             </div>
         </aside>
 
-        <main class="display-area">
-            <canvas id="simCanvas"></canvas>
-            <div class="instructions">
-                <p><strong>Click & Drag</strong> on the grid to paint life. Watch them interact, move, hunt, breed, and survive.</p>
-            </div>
+        <main id="sim-container">
+            <div class="hint">Click on the grid to place objects.</div>
         </main>
     </div>
 
     <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
-
-        const CELL_SIZE = 12; 
-        const COLS = 65;      
-        const ROWS = 50;      
-        canvas.width = COLS * CELL_SIZE;
-        canvas.height = ROWS * CELL_SIZE;
-
-        const CONFIG = {
-            plantGrowChance: 0.008,      
-            herbivoreVision: 4,         
-            predatorVision: 6,          
-            starveHerbivore: 0.4,       
-            starvePredator: 0.5,        
-            energyFromPlant: 15,        
-            energyFromHerbivore: 35,    
-            breedEnergy: 45             
+        // -- Core Setup Variables --
+        const COLS = 50;
+        const ROWS = 40;
+        let currentTool = 'plant';
+        let weatherState = 'sunny';
+        let paused = false;
+        
+        const simSettings = {
+            growRate: 0.008, rainGrowRate: 0.04,
+            hVision: 4, pVision: 6,
+            plantEnergy: 20, meatEnergy: 40,
+            breedThreshold: 45
         };
 
-        let grid = new Array(COLS).fill(null).map(() => new Array(ROWS).fill('empty'));
-        let entities = [];
-        let currentTool = 'plant';
-        let isPaused = false;
-        let isDrawing = false;
+        // -- Three.js Initialization --
+        const container = document.getElementById('sim-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x151515);
+        scene.fog = new THREE.FogExp2(0x151515, 0.02);
 
-        class Agent {
-            constructor(x, y, type, energy) {
-                this.x = x;
-                this.y = y;
-                this.type = type;
-                this.energy = energy;
-                this.age = 0;
-            }
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(COLS/2, 35, ROWS + 15);
+        camera.lookAt(COLS/2, 0, ROWS/2);
 
-            wander() {
-                let dx = Math.floor(Math.random() * 3) - 1; 
-                let dy = Math.floor(Math.random() * 3) - 1;
-                this.move(this.x + dx, this.y + dy);
-            }
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
 
-            move(newX, newY) {
-                if (newX >= 0 && newX < COLS && newY >= 0 && newY < ROWS) {
-                    this.x = newX;
-                    this.y = newY;
-                }
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        const sunLight = new THREE.DirectionalLight(0xffdf80, 0.8);
+        sunLight.position.set(10, 50, 10);
+        scene.add(sunLight);
+
+        // Grid Floor
+        const floorGeo = new THREE.PlaneGeometry(COLS, ROWS);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(COLS/2 - 0.5, 0, ROWS/2 - 0.5);
+        scene.add(floor);
+
+        const gridHelper = new THREE.GridHelper(Math.max(COLS, ROWS), Math.max(COLS, ROWS), 0x333333, 0x333333);
+        gridHelper.position.set(COLS/2 - 0.5, 0.01, ROWS/2 - 0.5);
+        scene.add(gridHelper);
+
+        // Rain Particles
+        const rainGeo = new THREE.BufferGeometry();
+        const rainCount = 1500;
+        const rainArray = new Float32Array(rainCount * 3);
+        for(let i=0; i<rainCount*3; i+=3) {
+            rainArray[i] = Math.random() * COLS;
+            rainArray[i+1] = Math.random() * 40;
+            rainArray[i+2] = Math.random() * ROWS;
+        }
+        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainArray, 3));
+        const rainMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.2, transparent: true, opacity: 0.6 });
+        const rainSystem = new THREE.Points(rainGeo, rainMat);
+        rainSystem.visible = false;
+        scene.add(rainSystem);
+
+        // -- Game Logic State --
+        let grid = Array(COLS).fill().map(() => Array(ROWS).fill(false)); 
+        let plantMeshes = Array(COLS).fill().map(() => Array(ROWS).fill(null));
+        let animals = [];
+
+        // Materials for instances
+        const matPlant = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+        const matHerb = new THREE.MeshLambertMaterial({ color: 0x2196F3 });
+        const matPred = new THREE.MeshLambertMaterial({ color: 0xF44336 });
+        const matInfected = new THREE.MeshLambertMaterial({ color: 0x9C27B0 });
+        const boxGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        const sphereGeo = new THREE.SphereGeometry(0.5, 8, 8);
+
+        // Pre-build plant meshes to save CPU
+        for(let x=0; x<COLS; x++) {
+            for(let z=0; z<ROWS; z++) {
+                let p = new THREE.Mesh(boxGeo, matPlant);
+                p.position.set(x, 0.4, z);
+                p.scale.setScalar(Math.random() * 0.4 + 0.6);
+                p.visible = false;
+                scene.add(p);
+                plantMeshes[x][z] = p;
             }
         }
 
-        class Herbivore extends Agent {
-            constructor(x, y) {
-                super(x, y, 'herbivore', 25);
+        // -- Classes --
+        class Creature {
+            constructor(x, z, type) {
+                this.x = x; this.z = z;
+                this.type = type;
+                this.energy = type === 'herbivore' ? 30 : 50;
+                this.infected = false;
+                
+                this.mesh = new THREE.Mesh(sphereGeo, type === 'herbivore' ? matHerb : matPred);
+                this.mesh.position.set(x, 0.5, z);
+                scene.add(this.mesh);
             }
 
-            update() {
-                this.energy -= CONFIG.starveHerbivore;
-                this.age++;
+            move(dx, dz) {
+                let nx = this.x + dx;
+                let nz = this.z + dz;
+                if(nx >= 0 && nx < COLS && nz >= 0 && nz < ROWS) {
+                    this.x = nx; this.z = nz;
+                }
+            }
 
-                let target = this.findNearestTarget('plant', CONFIG.herbivoreVision);
+            logic() {
+                this.energy -= this.infected ? 1.2 : 0.6;
+                this.mesh.material = this.infected ? matInfected : (this.type === 'herbivore' ? matHerb : matPred);
+                
+                // Spread sickness
+                if(this.infected) {
+                    animals.forEach(a => {
+                        if(a !== this && !a.infected && Math.abs(a.x - this.x) <= 1 && Math.abs(a.z - this.z) <= 1) {
+                            if(Math.random() < 0.2) a.infected = true;
+                        }
+                    });
+                }
 
-                if (target) {
-                    let stepX = Math.sign(target.x - this.x);
-                    let stepY = Math.sign(target.y - this.y);
-                    this.move(this.x + stepX, this.y + stepY);
-
-                    if (grid[this.x][this.y] === 'plant') {
-                        grid[this.x][this.y] = 'empty';
-                        this.energy += CONFIG.energyFromPlant;
+                if(this.type === 'herbivore') {
+                    this.hunt(simSettings.hVision);
+                    if(grid[this.x][this.z]) {
+                        grid[this.x][this.z] = false;
+                        plantMeshes[this.x][this.z].visible = false;
+                        this.energy += simSettings.plantEnergy;
                     }
                 } else {
-                    this.wander();
+                    let prey = this.hunt(simSettings.pVision);
+                    if(prey && Math.abs(prey.x - this.x) <= 1 && Math.abs(prey.z - this.z) <= 1) {
+                        prey.dead = true;
+                        if(prey.infected && Math.random() < 0.7) this.infected = true;
+                        this.energy += simSettings.meatEnergy;
+                    }
                 }
 
-                if (this.energy >= CONFIG.breedEnergy) {
+                if(this.energy > simSettings.breedThreshold) {
                     this.energy /= 2;
-                    entities.push(new Herbivore(this.x, this.y));
+                    let baby = new Creature(this.x, this.z, this.type);
+                    if(this.infected && Math.random() > 0.5) baby.infected = true;
+                    animals.push(baby);
                 }
+
+                // Smooth 3D move
+                this.mesh.position.lerp(new THREE.Vector3(this.x, 0.5, this.z), 0.2);
             }
 
-            findNearestTarget(targetType, visionRadius) {
-                let closestDist = Infinity;
-                let closestTarget = null;
-
-                for (let dx = -visionRadius; dx <= visionRadius; dx++) {
-                    for (let dy = -visionRadius; dy <= visionRadius; dy++) {
-                        let tx = this.x + dx;
-                        let ty = this.y + dy;
-
-                        if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS) {
-                            if (grid[tx][ty] === targetType) {
-                                let dist = Math.abs(dx) + Math.abs(dy); 
-                                if (dist < closestDist) {
-                                    closestDist = dist;
-                                    closestTarget = { x: tx, y: ty };
-                                }
+            hunt(radius) {
+                let target = null, minDist = 999;
+                
+                if(this.type === 'herbivore') {
+                    for(let dx=-radius; dx<=radius; dx++) {
+                        for(let dz=-radius; dz<=radius; dz++) {
+                            let tx = this.x+dx, tz = this.z+dz;
+                            if(tx>=0 && tx<COLS && tz>=0 && tz<ROWS && grid[tx][tz]) {
+                                let d = Math.abs(dx) + Math.abs(dz);
+                                if(d < minDist) { minDist = d; target = {x:tx, z:tz}; }
                             }
                         }
                     }
+                } else {
+                    animals.forEach(a => {
+                        if(a.type === 'herbivore' && !a.dead) {
+                            let d = Math.abs(a.x - this.x) + Math.abs(a.z - this.z);
+                            if(d <= radius && d < minDist) { minDist = d; target = a; }
+                        }
+                    });
                 }
-                return closestTarget;
+
+                if(target) {
+                    this.move(Math.sign(target.x - this.x), Math.sign(target.z - this.z));
+                } else {
+                    this.move(Math.floor(Math.random()*3)-1, Math.floor(Math.random()*3)-1);
+                }
+                return target;
+            }
+
+            die() {
+                scene.remove(this.mesh);
             }
         }
 
-        class Predator extends Agent {
-            constructor(x, y) {
-                super(x, y, 'predator', 40);
+        // -- Interaction / UI Events --
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        document.querySelectorAll('.tool-btn').forEach(b => b.onclick = (e) => {
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            currentTool = e.target.dataset.tool;
+        });
+
+        document.querySelectorAll('.weather-btn').forEach(b => b.onclick = (e) => {
+            document.querySelectorAll('.weather-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            weatherState = e.target.dataset.weather;
+            document.getElementById('stat-weather').innerText = weatherState === 'sunny' ? 'Sunny' : 'Rainy';
+            document.getElementById('stat-weather').style.color = weatherState === 'sunny' ? '#FFEB3B' : '#2196F3';
+            
+            // Adjust 3D lighting/effects based on weather
+            sunLight.intensity = weatherState === 'sunny' ? 0.8 : 0.2;
+            ambientLight.intensity = weatherState === 'sunny' ? 0.4 : 0.6;
+            rainSystem.visible = (weatherState === 'rainy');
+        });
+
+        document.getElementById('btn-pause').onclick = (e) => {
+            paused = !paused;
+            e.target.innerText = paused ? "▶️ Play" : "⏸️ Pause";
+            e.target.style.backgroundColor = paused ? "#ff9800" : "";
+        };
+
+        document.getElementById('btn-clear').onclick = () => {
+            for(let x=0; x<COLS; x++) {
+                for(let z=0; z<ROWS; z++) { grid[x][z] = false; plantMeshes[x][z].visible = false; }
             }
+            animals.forEach(a => a.die());
+            animals = [];
+        };
 
-            update() {
-                this.energy -= CONFIG.starvePredator;
-                this.age++;
+        document.getElementById('btn-drought').onclick = () => {
+            for(let x=0; x<COLS; x++) {
+                for(let z=0; z<ROWS; z++) {
+                    if(grid[x][z] && Math.random() < 0.7) { grid[x][z] = false; plantMeshes[x][z].visible = false; }
+                }
+            }
+        };
 
-                let target = this.findNearestHerbivore(CONFIG.predatorVision);
+        document.getElementById('btn-virus').onclick = () => {
+            animals.forEach(a => { if(Math.random() < 0.4) a.infected = true; });
+        };
 
-                if (target) {
-                    let stepX = Math.sign(target.x - this.x);
-                    let stepY = Math.sign(target.y - this.y);
-                    this.move(this.x + stepX, this.y + stepY);
+        // Handle 3D Clicks
+        let isDragging = false;
+        container.onmousedown = (e) => { isDragging = true; interact(e); };
+        container.onmousemove = (e) => { if(isDragging) interact(e); };
+        window.onmouseup = () => isDragging = false;
 
-                    if (Math.abs(this.x - target.x) <= 1 && Math.abs(this.y - target.y) <= 1) {
-                        entities = entities.filter(e => e !== target); 
-                        this.energy += CONFIG.energyFromHerbivore;
+        function interact(e) {
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / container.clientWidth) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / container.clientHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObject(floor);
+
+            if(hits.length > 0) {
+                let px = Math.round(hits[0].point.x);
+                let pz = Math.round(hits[0].point.z);
+                
+                if(px>=0 && px<COLS && pz>=0 && pz<ROWS) {
+                    if(currentTool === 'plant') {
+                        grid[px][pz] = true;
+                        plantMeshes[px][pz].visible = true;
                     }
-                } else {
-                    this.wander();
-                }
-
-                if (this.energy >= CONFIG.breedEnergy + 10) {
-                    this.energy /= 2;
-                    entities.push(new Predator(this.x, this.y));
+                    if(currentTool === 'herbivore' && e.type === 'mousedown') animals.push(new Creature(px, pz, 'herbivore'));
+                    if(currentTool === 'predator' && e.type === 'mousedown') animals.push(new Creature(px, pz, 'predator'));
+                    if(currentTool === 'meteor') {
+                        for(let dx=-3; dx<=3; dx++) {
+                            for(let dz=-3; dz<=3; dz++) {
+                                let tx = px+dx, tz = pz+dz;
+                                if(tx>=0 && tx<COLS && tz>=0 && tz<ROWS && (dx*dx+dz*dz)<=9) {
+                                    grid[tx][tz] = false; plantMeshes[tx][tz].visible = false;
+                                }
+                            }
+                        }
+                        animals.forEach(a => {
+                            if((a.x-px)**2 + (a.z-pz)**2 <= 9) a.dead = true;
+                        });
+                    }
                 }
             }
+        }
 
-            findNearestHerbivore(visionRadius) {
-                let closestDist = Infinity;
-                let closestTarget = null;
+        // -- Setup initial scenario --
+        for(let i=0; i<150; i++) {
+            let rx = Math.floor(Math.random()*COLS), rz = Math.floor(Math.random()*ROWS);
+            grid[rx][rz] = true; plantMeshes[rx][rz].visible = true;
+        }
+        for(let i=0; i<15; i++) animals.push(new Creature(Math.floor(Math.random()*COLS), Math.floor(Math.random()*ROWS), 'herbivore'));
+        for(let i=0; i<4; i++) animals.push(new Creature(Math.floor(Math.random()*COLS), Math.floor(Math.random()*ROWS), 'predator'));
 
-                for (let entity of entities) {
-                    if (entity.type === 'herbivore') {
-                        let dist = Math.abs(entity.x - this.x) + Math.abs(entity.y - this.y);
-                        if (dist <= visionRadius && dist < closestDist) {
-                            closestDist = dist;
-                            closestTarget = entity;
+        // -- Main Loop --
+        let lastTime = 0;
+        
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            // Limit logical steps to roughly 12 FPS so it isn't too fast, while keeping renderer at 60 FPS
+            if(!paused && time - lastTime > 80) {
+                lastTime = time;
+
+                // Plants grow
+                let rate = weatherState === 'rainy' ? simSettings.rainGrowRate : simSettings.growRate;
+                for(let x=0; x<COLS; x++) {
+                    for(let z=0; z<ROWS; z++) {
+                        if(!grid[x][z] && Math.random() < rate) {
+                            grid[x][z] = true; plantMeshes[x][z].visible = true;
                         }
                     }
                 }
-                return closestTarget;
+
+                // Update animals and filter dead
+                animals.forEach(a => a.logic());
+                animals = animals.filter(a => {
+                    if(a.energy <= 0 || a.dead) { a.die(); return false; }
+                    return true;
+                });
+
+                // Update telemetry
+                let pCount = 0;
+                grid.forEach(col => col.forEach(cell => { if(cell) pCount++; }));
+                document.getElementById('stat-plants').innerText = pCount;
+                document.getElementById('stat-herbivores').innerText = animals.filter(a => a.type === 'herbivore').length;
+                document.getElementById('stat-predators').innerText = animals.filter(a => a.type === 'predator').length;
+                document.getElementById('stat-infected').innerText = animals.filter(a => a.infected).length;
             }
-        }
 
-        document.querySelectorAll('.tool-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
-                currentTool = e.target.getAttribute('data-tool');
-            });
-        });
-
-        const pauseBtn = document.getElementById('btn-pause');
-        pauseBtn.addEventListener('click', () => {
-            isPaused = !isPaused;
-            pauseBtn.innerText = isPaused ? "▶️ Play" : "⏸️ Pause";
-            pauseBtn.style.backgroundColor = isPaused ? "#ff9800" : "#2d2d2d";
-        });
-
-        document.getElementById('btn-clear').addEventListener('click', () => {
-            grid = new Array(COLS).fill(null).map(() => new Array(ROWS).fill('empty'));
-            entities = [];
-        });
-
-        canvas.addEventListener('mousedown', (e) => { isDrawing = true; spawnInput(e); });
-        canvas.addEventListener('mousemove', (e) => { if (isDrawing) spawnInput(e); });
-        window.addEventListener('mouseup', () => isDrawing = false);
-
-        function spawnInput(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clickX = Math.floor((e.clientX - rect.left) / CELL_SIZE);
-            const clickY = Math.floor((e.clientY - rect.top) / CELL_SIZE);
-
-            if (clickX >= 0 && clickX < COLS && clickY >= 0 && clickY < ROWS) {
-                if (currentTool === 'plant') {
-                    grid[clickX][clickY] = 'plant';
-                } else if (currentTool === 'herbivore') {
-                    if (!entities.some(e => e.x === clickX && e.y === clickY)) {
-                        entities.push(new Herbivore(clickX, clickY));
-                    }
-                } else if (currentTool === 'predator') {
-                    if (!entities.some(e => e.x === clickX && e.y === clickY)) {
-                        entities.push(new Predator(clickX, clickY));
-                    }
+            // Animate Rain
+            if(weatherState === 'rainy') {
+                const positions = rainSystem.geometry.attributes.position.array;
+                for(let i=1; i<rainCount*3; i+=3) {
+                    positions[i] -= 1.5; // drop down
+                    if(positions[i] < 0) { positions[i] = 40; } // reset height
                 }
+                rainSystem.geometry.attributes.position.needsUpdate = true;
             }
+
+            renderer.render(scene, camera);
         }
 
-        function stepSimulation() {
-            if (isPaused) return;
+        window.onresize = () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        };
 
-            for (let x = 0; x < COLS; x++) {
-                for (let y = 0; y < ROWS; y++) {
-                    if (grid[x][y] === 'empty' && Math.random() < CONFIG.plantGrowChance) {
-                        grid[x][y] = 'plant';
-                    }
-                }
-            }
-
-            for (let i = entities.length - 1; i >= 0; i--) {
-                let entity = entities[i];
-                entity.update();
-
-                if (entity.energy <= 0) {
-                    entities.splice(i, 1);
-                }
-            }
-        }
-
-        function renderGraphics() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            for (let x = 0; x < COLS; x++) {
-                for (let y = 0; y < ROWS; y++) {
-                    if (grid[x][y] === 'plant') {
-                        ctx.fillStyle = '#4CAF50';
-                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-                    }
-                }
-            }
-
-            for (let entity of entities) {
-                if (entity.type === 'herbivore') ctx.fillStyle = '#2196F3';
-                if (entity.type === 'predator') ctx.fillStyle = '#F44336';
-                
-                ctx.fillRect(entity.x * CELL_SIZE, entity.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            }
-
-            let plantCount = 0;
-            for(let r=0; r<COLS; r++) {
-                plantCount += grid[r].filter(cell => cell === 'plant').length;
-            }
-            document.getElementById('stat-plants').innerText = plantCount;
-            document.getElementById('stat-herbivores').innerText = entities.filter(e => e.type === 'herbivore').length;
-            document.getElementById('stat-predators').innerText = entities.filter(e => e.type === 'predator').length;
-        }
-
-        function mainLoop() {
-            stepSimulation();
-            renderGraphics();
-            setTimeout(() => {
-                requestAnimationFrame(mainLoop);
-            }, 1000 / 12); 
-        }
-
-        mainLoop();
+        animate(0);
     </script>
 </body>
 </html>
-
-
